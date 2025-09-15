@@ -1,32 +1,41 @@
-const express = require("express")
-const app = express()
+// index.js
+require('dotenv').config();
+const express = require('express');
+const connectDB = require('./config/db');
+const UserRoutes = require('./routes/user_routes');
 
-const connectDB = require('./config/db.js')
-const UserRoutes = require('./routes/user_routes.js')
-// api get simple 
+const app = express();
+const port = process.env.PORT || 3000;
 
-const object = [{
-    name: "Abdul Basit",
-    age: "25"
-},{
-    name : "Munim Sarfarz",
-    age: "23"
-},{
-    name: "Hamza",
-    age: "22"
-},{
-    name: "Jawad Ahmad",
-    age: "27"
-}]
+// middleware to parse JSON body
+app.use(express.json());
 
-app.get('/aboutmyself', (req,res)=>{
-    res.send({msg:'Welcome to backend development',data:object})
-})
+// // simple sample route
+// const object = [
+//   { name: "Abdul Basit", age: "25" },
+//   { name: "Munim Sarfarz", age: "23" },
+//   { name: "Hamza", age: "22" },
+//   { name: "Jawad Ahmad", age: "27" }
+// ];
 
-// middleware
-app.use('/api/v0/users', UserRoutes)
+// app.get('/aboutmyself', (req, res) => {
+//   res.json({ msg: 'Welcome to backend development', data: object });
+// });
 
-app.listen(3000,()=>{
-    connectDB()
-    console.log('server is running at port 3000')
-})
+// API routes
+app.use('/api/v0/users', UserRoutes);
+
+// connect DB first, then start server
+const start = async () => {
+  try {
+    await connectDB();
+    app.listen(port, () => {
+      console.log(`🚀 Server running on port ${port}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server because DB connection failed.', err);
+    process.exit(1);
+  }
+};
+
+start();
