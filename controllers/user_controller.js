@@ -1,5 +1,6 @@
 // controllers/user_controller.js
 const User = require('../models/user_model.js');
+const bcrypt = require('bcryptjs');
 
 // GET /api/v0/users/getAllUser
 exports.getAllUser = async (req, res) => {
@@ -20,13 +21,17 @@ exports.createNewUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
-    // optional: check existing
+    // check existing
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ success: false, message: 'User already exists' });
     }
 
-    const user = await User.create({ username, email, password });
+    // hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = await User.create({ username, email, password: hashedPassword });
     const userWithoutPassword = user.toObject();
     delete userWithoutPassword.password;
 
@@ -37,11 +42,48 @@ exports.createNewUser = async (req, res) => {
   }
 };
 
+// PUT /api/v0/users/:userId
+// Updates user's username, email and/or password
+exports.updateUser = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const { username, email, password } = req.body;
+
+    // Build update object only with provided fields
+    const update = {};
+    if (username) update.username = username;
+    if (email) update.email = email;
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      update.password = await bcrypt.hash(password, salt);
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields provided to update' });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: update },
+      { new: true, runValidators: true, context: 'query' }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    return res.status(200).json({ success: true, data: updatedUser });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // DELETE /api/v0/users/:userId
 exports.deleteUser = async (req, res) => {
   try {
-    const userId = req.params._id; // usually camelCase in route params
-    const deletedUser = await User.findByIdAndDelete(_id);
+    const userId = req.params.userId; // expect route param :userId
+    const deletedUser = await User.findByIdAndDelete(userId).select('-password');
 
     if (!deletedUser) {
       return res.status(404).json({
@@ -64,5 +106,4 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-
-//   module.exports = { getAllUser, createNewUser, deleteUser }
+module.exports = { getAllUser, createNewUser, updateUser, deleteUser };
